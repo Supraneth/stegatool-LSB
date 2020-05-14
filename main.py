@@ -8,10 +8,10 @@ import hashlib
 from Crypto.Cipher import AES
 from Crypto import Random
 import math
+import matplotlib.pyplot as plt
 
 
 # Définition des fonctions générales
-
 # Fonction présente mais non utilisée dans le programme : permet de générer
 # des images BMP aléatoire de taille 200x200
 def generateBMP():
@@ -65,7 +65,6 @@ def tabPixels_to_tabBinaries(tabPixels):
 def string_to_binary(data):
     userInput_bytes = bytes(data, "ascii")
     binInput = (''.join(["{0:08b}".format(x) for x in userInput_bytes]))
-    print("[!] Conversion of ciphertext '%s' to binary : %s " % (data,binInput))
     tabBin = []
     for x in  binInput:
         tabBin.append(x)
@@ -117,7 +116,6 @@ def encrypt(raw, password):
     iv = Random.new().read(AES.block_size)
     cipher = AES.new(private_key, AES.MODE_CBC, iv)
     cipher = str(base64.b64encode(iv + cipher.encrypt(raw))).split("'")
-    print ("[!] Chiffrement du message avec l'algorithme AES 256 + hash en base64 : ", cipher[1])
     return cipher[1]
 
 # Fonction permettant le déchiffrement d'une entrée avec un mot de passe passé en paramètre  
@@ -174,39 +172,47 @@ def pixels_to_image(pixels,infilename,outfilename):
 # Cette fonction détaille le processus complet d'insertion de données avec une gestion
 # fine d'erreur : si le message est trop long par rapport au support, alors une erreur
 # est relevée (taux stéganographique trop haut)
-def insertData(binaryMessage, tabBinaries, seedUser):
+def insertData(binaryMessage, tabBinaries, seedUser, alea):
     print ("[!] Processus d'insertion des données en cours...")
-    # Génération de la graine
-    random.seed(seedUser)
-    # Initialisation du tableau de départ qui permet une première génération de nombres
-    # aléatoire
-    init_table = []
-    # On remplit le tableau sans tenir compte des redondances
-    for i in range (0, 3 * len(binaryMessage)):
-        init_table.append(random.randint(0,9999999) % (3 * len(tabBinaries)))
-    # Initialisation d'un second tableau permettant de supprimer la redondance due à
-    # la génération aléatoire précédente
-    random_table = []
-    for i in init_table:
-        if i not in random_table:
-            random_table.append(i)
-    print ("[!] Vérification en cours...")
-    # vérification de la possibilité d'intégration du message (vérification du taux stéga)
-    if len(random_table) < len(binaryMessage):
-        print("[/!\] Erreur : le message est trop long pour être inséré correctement dans l'image")
-        return 0
-    elif len(binaryMessage) >= (3* len(tabBinaries)):
-        print("[/!\] Erreur : le message est trop long pour être inséré correctement dans l'image")
-    print("[!] Longueur du message acceptable par rapport à la taille de l'image : début de l'insertion...")
-    # Fin vérification #
+    if alea:
+        # Génération de la graine
+        random.seed(seedUser)
+        # Initialisation du tableau de départ qui permet une première génération de nombres
+        # aléatoire
+        init_table = []
+        # On remplit le tableau sans tenir compte des redondances
+        for i in range (0, 3 * len(binaryMessage)):
+            init_table.append(random.randint(0,9999999) % (3 * len(tabBinaries)))
+        # Initialisation d'un second tableau permettant de supprimer la redondance due à
+        # la génération aléatoire précédente
+        random_table = []
+        for i in init_table:
+            if i not in random_table:
+                random_table.append(i)
+        print ("[!] Vérification en cours...")
+        # vérification de la possibilité d'intégration du message (vérification du taux stéga)
+        if len(random_table) < len(binaryMessage):
+            print("[/!\] Erreur : le message est trop long pour être inséré correctement dans l'image")
+            return 0
+        elif len(binaryMessage) >= (3* len(tabBinaries)):
+            print("[/!\] Erreur : le message est trop long pour être inséré correctement dans l'image")
+        print("[!] Longueur du message acceptable par rapport à la taille de l'image : début de l'insertion...")
+        # Fin vérification #
 
-    # On insère les données de façon random en parcourant d'un côté le tableau binaire de l'image
-    # et le tableau de nombres aléatoires pour déterminer la position des LSB à modifier
-    listBinaries = tuple_to_list(tabBinaries)
-    for i in range (0,len(binaryMessage)):
-        listBinaries[random_table[i]] = listBinaries[random_table[i]][:-1] + binaryMessage[i]
-    finalTab = list_to_tuple(listBinaries)
-    print ("[!] Les données ont été correctement insérées !")
+        # On insère les données de façon random en parcourant d'un côté le tableau binaire de l'image
+        # et le tableau de nombres aléatoires pour déterminer la position des LSB à modifier
+        listBinaries = tuple_to_list(tabBinaries)
+        for i in range (0,len(binaryMessage)):
+            listBinaries[random_table[i]] = listBinaries[random_table[i]][:-1] + binaryMessage[i]
+        finalTab = list_to_tuple(listBinaries)
+        print ("[!] Les données ont été correctement insérées !")
+    else:
+        listBinaries = tuple_to_list(tabBinaries)
+        for i in range (0,len(binaryMessage)):
+            listBinaries[i] = listBinaries[i][:-1] + binaryMessage[i]
+        finalTab = list_to_tuple(listBinaries)
+        print ("[!] Les données ont été correctement insérées !")
+
     return finalTab
 
     
@@ -297,6 +303,73 @@ def detection(tabPixels, width, height):
         sum += tab[i]
     changerate = sum / len(tab)
     return changerate
+
+def list_tvp_tfp(folder):
+    listTVP = []
+    listTFP = []
+    tfp = 0
+    tvp = 0
+    detect = True
+    listChangeRateClean = []
+    listChangeRateLSB = []
+
+    for i in range (1,101):
+        imagePath = folder + "/%i.jpg" % (i)
+        dataImage = image_to_imageData(imagePath)
+        width, height = dataImage.size
+        tabPixelImage = imageData_to_tabPixels(dataImage)
+        changerate = detection(tabPixelImage, width, height)
+        print("Taux de change final estimé de l'image suspectée : ", changerate)
+        listChangeRateClean.append(changerate)
+
+    for i in range (101,201):
+        imagePath = folder + "/%i.jpg" % (i)
+        dataImage = image_to_imageData(imagePath)
+        width, height = dataImage.size
+        tabPixelImage = imageData_to_tabPixels(dataImage)
+        changerate = detection(tabPixelImage, width, height)
+        print("Taux de change final estimé de l'image suspectée : ", changerate)
+        listChangeRateLSB.append(changerate)
+
+    for threshold in range (-100,100001):
+        threshold = threshold * 0.00001
+        tfp = 0
+        tvp = 0
+        for changerate in listChangeRateClean:
+            if changerate <= threshold:
+                detect = False            
+            elif changerate >= threshold:
+                detect = True
+            if (detect):
+                tfp += 1
+        for changerate in listChangeRateLSB:
+            if changerate <= threshold:
+                detect = False
+            elif changerate >= threshold:
+                detect = True
+            if (detect):
+                tvp += 1
+        tfp = tfp / 100
+        tvp = tvp / 100
+        listTFP.append(tfp)
+        listTVP.append(tvp)
+
+    return listTFP, listTVP
+
+def generate_message(bpp,largeur,hauteur):
+    len_message = (bpp*largeur*hauteur) / 8
+    print(len_message)
+    len_message = int(len_message)
+    print(len_message)
+    alphabet = ["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"]
+    message = ""
+    for i in range (0,len_message):
+        message += alphabet[i%(len(alphabet)-1)]
+    return message
+
+
+
+
 # Fonction principale
 if __name__ == '__main__':
     print("[Hello] TP Steganographie - Kevin MOREAU & Laurent GRAFF - ENSIBS Vannes - Specialite Cyberdefense")
@@ -306,16 +379,17 @@ if __name__ == '__main__':
     unpad = lambda s: s[:-ord(s[len(s) - 1:])] 
     while ans !='0':
         print ("""
-        1. Fonction d'insertion aléatoire d'un message (Chiffrement AES & Clé Stéganographique)
+        1. Fonction d'insertion d'un message (Chiffrement AES & Clé Stéganographique)
         2. Fonction de déchiffrement d'un message (Déchiffrement AES & Clé Stéganographique)
         3. Fonction de detection (Determine si l'image donnée contient un contenu dissimulé)
+        4. Test d'efficacité de la fonction de detection (courbe ROC)
         0. Quitter
         """
         )
         ans=input("Que voulez vous faire ? (saisir le chiffre) : ")
         
         if ans == "1":
-            print("[!] Fonction d'insertion aléatoire (Chiffrement AES & Clé Stéganographique) : ")
+            print("[!] Fonction d'insertion  (Chiffrement AES & Clé Stéganographique) : ")
             imagePath = input("[i] Entrer le nom de l'image à utiliser comme couverture (cover-image) : ")
             encryptedImage = input("[i] Donner un nom à image de sortie (stego-image) ")
             #Ouverture de l'image
@@ -328,13 +402,19 @@ if __name__ == '__main__':
             inputUser = input("[i] Taper le message à cacher dans l'image : ")
             keyUser = input("[i] Taper la clé de chiffrement à utiliser : ")
             seedUser = input("[i] Taper la clé steganographique à utiliser : ")
+            print("Insérer les données de façon aléatoire ? [1] Oui [0] Non")
+            choiceAlea = int(input("[i] Saisir le choix 1 ou 0: "))
+            if choiceAlea == 0:
+                alea = False
+            else:
+                alea = True
             cipherInputUser = encrypt(inputUser, keyUser)
             plainTextUser = decrypt(cipherInputUser, keyUser)
             #Conversion de la chaîne de caractères en entrée en données binaires
             binInputUser = string_to_binary(cipherInputUser)
             #Ajout de l'header au message d'origine
             binaryMessage = importHeader(binInputUser)
-            newTabBinaries = insertData(binaryMessage, tabBinaries, seedUser)
+            newTabBinaries = insertData(binaryMessage, tabBinaries, seedUser, alea)
             newTabPixels = binary_to_pixels(newTabBinaries)
             finalDataImage = pixels_to_image(newTabPixels, imagePath, encryptedImage)
         elif ans == "2":
@@ -369,7 +449,71 @@ if __name__ == '__main__':
             elif changerate >= threshold:
                 print("Détection réussie, des données ont été insérées dans l'image")
 
+
+        elif ans == "4":
+
+            # Cette partie permet de générer 100 images contenant des LSB. Cette partie
+            # est volontairement commenté pour éviter la regénération à chaque lancement
+            # de la fonction. A décommenter lorsque le programme est lancé pour la
+            # première fois sur votre machine 
+
+            print("[!] Test d'efficacité de la fonction de detection (courbe ROC) : ")
+            """
+            #Largeur et hauteur des images traitées
+            width = 700
+            height = 500
+            bpp = input("Entrer le BPP souhaité : ")
+            bpp = float(bpp)
+            message = generate_message(bpp, width, height)
+            passwordAES = "password1234"
+            passwordStega = "password"
+            cipherMessage = message
+            print("Insérer les données de façon aléatoire ? [1] Oui [0] Non")
+            choiceAlea = int(input("[i] Saisir le choix 1 ou 0: "))
+            if choiceAlea == 0:
+                alea = False
+            else:
+                alea = True
+            #Conversion du message en entrée en données binaires
+            binaryMessage = string_to_binary(cipherMessage)
+            #Ici, binaryMessage est le message finale à insérer dans chacune des 50 images LSB
             
+            #Insertion LSB dans chacun des images choisies pour acceuillir des messages en LSB
+            for i in range (101,201):
+                imagePath = "jpg/%i.jpg" % (i)
+                encryptedImage = "jpg/%i.jpg" % (i)
+                imageData = image_to_imageData(imagePath)
+                #Récupération des données de l'image
+                tabPixels = imageData_to_tabPixels(imageData)
+                #Conversion des données des pixels en données binaires
+                tabBinaries = tabPixels_to_tabBinaries(tabPixels)
+                newTabBinaries = insertData(binaryMessage, tabBinaries, passwordStega, alea)
+                newTabPixels = binary_to_pixels(newTabBinaries)
+                finalDataImage = pixels_to_image(newTabPixels, imagePath, encryptedImage)
+            """
+            
+            # Génération des listes TVP / TFP
+            folder = "jpg"
+            tfp, tvp = list_tvp_tfp(folder)
+            print("Vrai positifs de 0 à 1")
+            print(tvp)
+            print("Faux positifs de 0 à 1")
+            print(tfp)
+            plt.figure(1)
+            plt.xlim(0,1)
+            plt.ylim(0,1)
+            plt.plot(tfp,tvp)
+            plt.show()
+
+
+
+
+
+
+
+
+
+
         elif ans == "0":
             print("[!] Goodbye my friend... ")
 
