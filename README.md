@@ -1,5 +1,6 @@
 # Outil stéganographique utilisant la technique LSB (least significant bit)
-A simple POC tool using LSB method for hide a message on a cover-image (insert, retrieve and detect)
+## Created with #zwex
 
-Projet en cours de développement...
+A simple POC tool using LSB method for hide a message on a cover-image (insert, retrieve and detect).
+
 
